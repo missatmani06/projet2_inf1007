@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod #défini une classe parent qui impose une méthode à ses classes enfants
 from src.exceptions import DonneeInvalideError
 import json
+import csv
+from datetime import datetime
 #mettre la lecture du csv dans une fonction réutilisable
 def charger_donnees(chemin: str) -> pd.DataFrame:#dataframe peremet de retourner dans un tableau pandas
     """Lit un fichier CSV et retourne ses données dans un DataFrame.
@@ -110,6 +112,34 @@ def creer_variables(metadonnees: dict) -> dict[str, Variable]:
                 nom, limites["min"], limites["max"]
             )
     return variables
+def enregistrer_prediction(chemin:str, valeurs:dict, prediction:float)->None:
+    """pour ajouter au csv la date, les entrées et les prédictions recues.
+    elle crée le fichier également avec ses en-tête au premier enregistrement et lève OSerror 
+    si le fichier ne peut pas être lu ou écrit"""
+    contient_des_donnees=(os.path.exists(chemin)and os.path.getsize(chemin)>0)
+    colonnes=["date"]+list(valeurs.keys())+["Calories_estimees"]#les carctéristiques de la séances déjà valider
+    date=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ligne=[date]+list(valeurs.values())+[prediction]
+    with open(chemin, "a", encoding="utf-8", newline="") as fichier: #le a signifie ajouter à la fin du fichier
+        ecrivain=csv.writer(fichier)
+        if not contient_des_donnees:
+            ecrivain.writerow(colonnes)
+        ecrivain.writerow(ligne)
+def lire_historique(chemin: str) -> list[dict[str, str]]:#il faut appeler cette fonction pour mettre le bouton dans l'interface
+    """Lit le CSV et retourne les prédictions, les plus récentes d'abord.
+    Reçoit le chemin du fichier et retourne une liste vide s'il est absent.
+    Lève OSError en cas d'erreur d'accès, csv.Error en cas d'erreur CSV
+    et KeyError si une ligne ne contient pas la colonne Date.
+    """
+    if not os.path.exists(chemin):
+        return []
+    with open(chemin, encoding="utf-8", newline="") as fichier:
+        historique = list(csv.DictReader(fichier))#lis chaque ligne comme un dictionnaire, les noms des colonnes deviennent les clées
+    return sorted(
+        historique,
+        key=lambda ligne: ligne["date"],#trier selon la date
+        reverse=True#place les dates les plus récentes en premier
+    )
 
 if __name__ == "__main__": #pour éviter que le code se relance à chaque fois qu'un fichier importe donnees.py
     chemin = os.path.join("donnees", "gym_members_exercise_tracking.csv")
